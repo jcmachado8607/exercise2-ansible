@@ -20,8 +20,8 @@
         method: POST
         body_format: json
         body:
-          username: "alexc@phoenixec.com"
-          password: "rw+c_y[m_jP[83[3A+Y^"
+          username: "email"
+          password: "pass"
           scopes: ["download"]
         return_content: yes
         status_code: 200
