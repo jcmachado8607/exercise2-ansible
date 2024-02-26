@@ -1,0 +1,104 @@
+---
+- name: Deploy AppDynamics Machine Agent to Linux machine
+  hosts: localhost ##Change to nodes or all 
+  vars:
+    appdynamics_version: "24.1.0.3984" 
+    controller_host: "CONTROLLERINFO"
+    controller_port: "443"
+    application_name: APP
+    controller_info_file: "/opt/AppDynamics/conf/controller-info.xml"
+    source_folder: "/opt/AppDynamics/"
+    backup_file: "/opt/AppDynamics-{{ ansible_date_time.date }}.tar.gz"
+    rollback_tasks_file: "rollback.yml"
+
+
+  tasks:
+#  Retrieve OAUTH token with the download scope - Download the agent using the oath token
+    - name: Retrieve OAuth token 
+      uri:
+        url: "https://identity.msrv.saas.appdynamics.com/v2.0/oauth/token"
+        method: POST
+        body_format: json
+        body:
+          username: "alexc@phoenixec.com"
+          password: "rw+c_y[m_jP[83[3A+Y^"
+          scopes: ["download"]
+        return_content: yes
+        status_code: 200
+      register: oauth_token
+
+    - name: Download AppDynamics Machine Agent
+      command: "curl -L -o /tmp/MachineAgent-bundle-64bit-linux.zip -H 'Authorization: Bearer {{ oauth_token.json.access_token }}' https://download.appdynamics.com/download/prox/download-file/machine-bundle/{{ appdynamics_version }}/machineagent-bundle-64bit-linux-{{ appdynamics_version }}.zip"
+
+#Backup current agent files if exist
+
+    - name: Check if source folder exists
+      ansible.builtin.stat:
+        path: "{{ source_folder }}"
+      register: folder_stat
+
+
+    - name: Create backup of source folder if it exists - Backup source folder
+      ansible.builtin.archive:
+        path: "{{ source_folder }}"
+        dest: "{{ backup_file }}"
+      when: folder_stat.stat.exists
+
+#Create, extract and symlink
+
+    - name: Create /opt/AppDynamics folder
+      file:
+        path: /opt/AppDynamics
+        state: directory
+        mode: '0755'
+
+    - name: Extract downloaded contents
+      unarchive:
+        src: "/tmp/MachineAgent-bundle-64bit-linux.zip"  
+        dest: "/opt/AppDynamics"
+        remote_src: yes
+
+    - name: Create symlink
+      file:
+        src: "/opt/AppDynamics"
+        dest: "/opt/MachineAgent"
+        state: link
+
+#Update controller info xml file - Add application name 
+        
+    - name: Update controller-host
+      xml:
+        path: "{{ controller_info_file }}"
+        xpath: "/controller-info/controller-host"
+        value: "{{ controller_host }}"
+        state: present
+
+    - name: Update controller-port
+      xml:
+        path: "{{ controller_info_file }}"
+        xpath: "/controller-info/controller-port"
+        value: "{{ controller_port }}"
+        state: present
+
+ #   - name: Add application-name element
+ #     lineinfile:
+ #       path: "{{ controller_info_file }}"
+ #       insertafter: "^<controller-info>"
+ #       line: "<application-name>{{ application_name }}</application-name>"
+
+    - name: Add application-name APP
+      xml:
+        path: "{{ controller_info_file }}"
+        xpath: "/controller-info"
+        add_children:
+        - application-name: APP  
+
+#Rollback
+        
+    - name: Check if backup file exists
+      ansible.builtin.stat:
+        path: "{{ backup_file }}"
+      register: backup_stat
+
+        
+            

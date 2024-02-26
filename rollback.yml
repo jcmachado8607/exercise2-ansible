@@ -1,0 +1,20 @@
+# rollback.yml
+
+- name: Rollback deployment
+  hosts: localhost
+  vars:
+    source_folder: "/opt/AppDynamics/"
+    backup_file: "/opt/AppDynamics-{{ ansible_date_time.date }}.tar.gz"
+
+  tasks:
+    - name: Check if backup file exists
+      ansible.builtin.stat:
+        path: "{{ backup_file }}"
+      register: backup_stat
+
+    - name: Extract backup file
+      ansible.builtin.unarchive:
+        src: "{{ backup_file }}"
+        dest: "{{ source_folder }}"
+      when: backup_stat.stat.exists
+
